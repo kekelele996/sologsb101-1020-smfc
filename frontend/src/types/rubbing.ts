@@ -12,6 +12,13 @@ export type InkTone = 'thick' | 'light';
 /** 状态：待编目 / 已编目 / 待比对 */
 export type RubbingState = 'toCatalog' | 'cataloged' | 'toCompare';
 
+/**
+ * 借展状态：未借展 / 已借出 / 待认领。
+ * 旧数据升级（v2 → v3）后一律按「未借展 inHouse」显示。
+ * 借展状态只由点交单对账写入，编目员在拓本表填的拓法等字段不受影响。
+ */
+export type RubbingLoanState = 'inHouse' | 'onLoan' | 'unclaimed';
+
 export interface Rubbing {
   id: string;
   /** 所属碑刻 id */
@@ -32,6 +39,12 @@ export interface Rubbing {
   dateGuess: string;
   /** 状态 */
   state: RubbingState;
+  /** 借展状态（旧数据升级后默认 inHouse 未借展） */
+  loanState: RubbingLoanState;
+  /** 借出时所在点交单 id；未借展 / 待认领时为 null */
+  loanManifestId: string | null;
+  /** 借出时外馆展柜号（点交单第二对账依据的留存）；未借出为 null */
+  loanCaseNo: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -80,6 +93,18 @@ export const RUBBING_STATE_OPTIONS: ReadonlyArray<{ value: RubbingState; label: 
 
 export const RUBBING_STATE_FLOW: readonly RubbingState[] = ['toCatalog', 'cataloged', 'toCompare'];
 
+export const RUBBING_LOAN_STATE_LABEL: Record<RubbingLoanState, string> = {
+  inHouse: '未借展',
+  onLoan: '已借出',
+  unclaimed: '待认领',
+};
+
+export const RUBBING_LOAN_STATE_COLOR: Record<RubbingLoanState, string> = {
+  inHouse: '#2f6f4f',
+  onLoan: '#a33a2c',
+  unclaimed: '#c9963c',
+};
+
 export function nextRubbingState(state: RubbingState): RubbingState {
   const index = RUBBING_STATE_FLOW.indexOf(state);
   if (index < 0 || index >= RUBBING_STATE_FLOW.length - 1) return state;
@@ -99,5 +124,8 @@ export function createEmptyRubbingDraft(steleId: string, versionNo: number): Rub
     collectionNo: '',
     dateGuess: '',
     state: 'toCatalog',
+    loanState: 'inHouse',
+    loanManifestId: null,
+    loanCaseNo: null,
   };
 }

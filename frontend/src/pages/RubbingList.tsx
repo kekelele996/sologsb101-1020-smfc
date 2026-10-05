@@ -49,6 +49,8 @@ import {
   INK_TONE_LABEL,
   INK_TONE_OPTIONS,
   PAPER_TYPE_OPTIONS,
+  RUBBING_LOAN_STATE_COLOR,
+  RUBBING_LOAN_STATE_LABEL,
   RUBBING_METHOD_LABEL,
   RUBBING_METHOD_OPTIONS,
   RUBBING_STATE_COLOR,
@@ -204,9 +206,15 @@ export default function RubbingList() {
       width: 90,
       sorter: (a, b) => a.versionNo - b.versionNo,
       render: (value: number, record) => (
-        <Space size={4}>
+        <Space size={4} wrap>
           <Tag color="#2f3a34">第 {value} 版</Tag>
           <Tag color={RUBBING_STATE_COLOR[record.state]}>{RUBBING_STATE_LABEL[record.state]}</Tag>
+          {record.loanState !== 'inHouse' ? (
+            <Tag color={RUBBING_LOAN_STATE_COLOR[record.loanState]}>
+              {RUBBING_LOAN_STATE_LABEL[record.loanState]}
+              {record.loanCaseNo ? ` · 柜 ${record.loanCaseNo}` : ''}
+            </Tag>
+          ) : null}
         </Space>
       ),
     },
@@ -423,6 +431,17 @@ export default function RubbingList() {
           <Form.Item name="state" label="状态" rules={[{ required: true }]}>
             <Select options={[...RUBBING_STATE_OPTIONS]} />
           </Form.Item>
+          {editing && editing.loanState !== 'inHouse' ? (
+            <Form.Item label="外借状态">
+              <Tag color={RUBBING_LOAN_STATE_COLOR[editing.loanState]}>
+                {RUBBING_LOAN_STATE_LABEL[editing.loanState]}
+                {editing.loanCaseNo ? ` · 展柜号 ${editing.loanCaseNo}` : ''}
+              </Tag>
+              <Typography.Text type="secondary" style={{ fontSize: 12, marginInlineStart: 8 }}>
+                借展标记由外借对账台写入，拓法等编目信息照旧保存。
+              </Typography.Text>
+            </Form.Item>
+          ) : null}
         </Form>
       </Modal>
 
