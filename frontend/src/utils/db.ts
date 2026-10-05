@@ -1,7 +1,9 @@
 /**
  * IndexedDB 持久化层（Dexie 封装）
- * - 数据结构版本号与升级迁移逻辑（v1 → v2：Loss 增加 charNo 与复合索引，并按行号顺序重建历史字位记录）
- * - 五张业务表的增删改查与整库导入导出
+ * - 数据结构版本号与升级迁移逻辑
+ *   v1 → v2：Loss 增加 charNo 与复合索引，并按行号顺序重建历史字位记录
+ *   v2 → v3：新增借展表 loans；Rubbing 增加 loanState，旧数据一律按未借展处理
+ * - 六张业务表的增删改查与整库导入导出
  * - 首次打开自动播种三层互相引用的演示数据（幂等）
  * 纯前端应用：不依赖任何后端服务或数据库。
  */
@@ -11,13 +13,14 @@ import type { Rubbing } from '@/types/rubbing';
 import type { Loss } from '@/types/loss';
 import type { Seal } from '@/types/seal';
 import type { Compare } from '@/types/compare';
+import type { Loan } from '@/types/loan';
 import { sortLosses } from './collate';
 
 /** 数据库名（README 与导出文件均使用该名称） */
 export const DB_NAME = 'gbrubbing';
 
 /** 当前数据结构版本号 */
-export const DB_SCHEMA_VERSION = 2;
+export const DB_SCHEMA_VERSION = 3;
 
 /** localStorage 侧少量元数据键 */
 export const LS_KEYS = {
@@ -85,6 +88,7 @@ class RubbingDatabase extends Dexie {
   losses!: Table<Loss, string>;
   seals!: Table<Seal, string>;
   compares!: Table<Compare, string>;
+  loans!: Table<Loan, string>;
 
   constructor() {
     super(DB_NAME);
@@ -99,7 +103,7 @@ class RubbingDatabase extends Dexie {
     });
 
     // v2：Loss 增加 charNo 与 [rubbingId+lineNo+charNo] 复合索引，并按行号顺序重建历史字位记录
-    this.version(DB_SCHEMA_VERSION)
+    this.version(2)
       .stores({
         steles: 'id, title, era, form, location, updatedAt',
         rubbings: 'id, steleId, versionNo, method, inkTone, state, updatedAt',
@@ -127,6 +131,21 @@ class RubbingDatabase extends Dexie {
           });
         });
         await table.bulkPut(sortLosses(rebuilt));
+      });
+
+    // v3：新增借展表 loans；Rubbing 增加 loanState 索引，旧数据一律按未借展显示
+    this.version(DB_SCHEMA_VERSION)
+      .stores({
+        rubbings: 'id, steleId, versionNo, method, inkTone, state, loanState, updatedAt',
+        loans: 'id, rubbingId, collectionNo, state, updatedAt',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table<Rubbing>('rubbings')
+          .toCollection()
+          .modify((row) => {
+            if (row.loanState !== 'onLoan') row.loanState = 'none';
+          });
       });
   }
 }
@@ -192,11 +211,11 @@ export async function seedDatabase(): Promise<void> {
   ];
 
   const rubbings: Rubbing[] = [
-    { id: 'rub_0101', steleId: 'stele_01', versionNo: 1, method: 'rub', paperType: '宣纸', inkTone: 'thick', sizeCm: '210×88', collectionNo: 'TB-0101', dateGuess: '明拓', state: 'cataloged', createdAt: now - day * 50, updatedAt: now - day * 10 },
-    { id: 'rub_0102', steleId: 'stele_01', versionNo: 2, method: 'cicada', paperType: '棉连纸', inkTone: 'light', sizeCm: '208×86', collectionNo: 'TB-0102', dateGuess: '清拓', state: 'toCompare', createdAt: now - day * 44, updatedAt: now - day * 6 },
-    { id: 'rub_0201', steleId: 'stele_02', versionNo: 1, method: 'pat', paperType: '皮纸', inkTone: 'thick', sizeCm: '250×196', collectionNo: 'TB-0201', dateGuess: '清中期拓', state: 'cataloged', createdAt: now - day * 40, updatedAt: now - day * 5 },
-    { id: 'rub_0202', steleId: 'stele_02', versionNo: 2, method: 'rub', paperType: '棉连纸', inkTone: 'light', sizeCm: '248×194', collectionNo: 'TB-0202', dateGuess: '清晚期拓', state: 'toCatalog', createdAt: now - day * 34, updatedAt: now - day * 4 },
-    { id: 'rub_0301', steleId: 'stele_03', versionNo: 1, method: 'rub', paperType: '净皮宣', inkTone: 'thick', sizeCm: '260×90', collectionNo: 'TB-0301', dateGuess: '民国拓', state: 'toCatalog', createdAt: now - day * 20, updatedAt: now - day * 2 },
+    { id: 'rub_0101', steleId: 'stele_01', versionNo: 1, method: 'rub', paperType: '宣纸', inkTone: 'thick', sizeCm: '210×88', collectionNo: 'TB-0101', dateGuess: '明拓', state: 'cataloged', loanState: 'none', createdAt: now - day * 50, updatedAt: now - day * 10 },
+    { id: 'rub_0102', steleId: 'stele_01', versionNo: 2, method: 'cicada', paperType: '棉连纸', inkTone: 'light', sizeCm: '208×86', collectionNo: 'TB-0102', dateGuess: '清拓', state: 'toCompare', loanState: 'none', createdAt: now - day * 44, updatedAt: now - day * 6 },
+    { id: 'rub_0201', steleId: 'stele_02', versionNo: 1, method: 'pat', paperType: '皮纸', inkTone: 'thick', sizeCm: '250×196', collectionNo: 'TB-0201', dateGuess: '清中期拓', state: 'cataloged', loanState: 'onLoan', createdAt: now - day * 40, updatedAt: now - day * 5 },
+    { id: 'rub_0202', steleId: 'stele_02', versionNo: 2, method: 'rub', paperType: '棉连纸', inkTone: 'light', sizeCm: '248×194', collectionNo: 'TB-0202', dateGuess: '清晚期拓', state: 'toCatalog', loanState: 'none', createdAt: now - day * 34, updatedAt: now - day * 4 },
+    { id: 'rub_0301', steleId: 'stele_03', versionNo: 1, method: 'rub', paperType: '净皮宣', inkTone: 'thick', sizeCm: '260×90', collectionNo: 'TB-0301', dateGuess: '民国拓', state: 'toCatalog', loanState: 'none', createdAt: now - day * 20, updatedAt: now - day * 2 },
   ];
 
   const losses: Loss[] = [
@@ -224,12 +243,43 @@ export async function seedDatabase(): Promise<void> {
     { id: 'cmp_0201', steleId: 'stele_02', rubbingIdA: 'rub_0201', rubbingIdB: 'rub_0202', diffCount: 1, conclusion: 'late', operator: '傅砚', date: '2026-03-08', createdAt: now - day * 3, updatedAt: now - day * 3 },
   ];
 
-  await db.transaction('rw', [db.steles, db.rubbings, db.losses, db.seals, db.compares], async () => {
+  const loans: Loan[] = [
+    {
+      id: 'loan_0201',
+      rubbingId: 'rub_0201',
+      collectionNo: 'TB-0201',
+      caseNo: 'A-02',
+      venue: '江南图书馆',
+      handoverDate: '2026-09-20',
+      state: 'onLoan',
+      reports: [
+        { id: 'lcr_020101', receivedAt: now - day * 6, reportDate: '2026-09-28', condition: '展柜恒温恒湿，拓片平整', newDamage: '' },
+        { id: 'lcr_020102', receivedAt: now - day * 2, reportDate: '2026-10-02', condition: '绫边一处起毛，已告知外馆修复组', newDamage: '下绫边起毛约 2 厘米（借展侧记录）' },
+      ],
+      createdAt: now - day * 15,
+      updatedAt: now - day * 2,
+    },
+    {
+      id: 'loan_0907',
+      rubbingId: null,
+      collectionNo: 'TB-0907',
+      caseNo: 'A-05',
+      venue: '江南图书馆',
+      handoverDate: '2026-09-20',
+      state: 'pendingClaim',
+      reports: [],
+      createdAt: now - day * 15,
+      updatedAt: now - day * 15,
+    },
+  ];
+
+  await db.transaction('rw', [db.steles, db.rubbings, db.losses, db.seals, db.compares, db.loans], async () => {
     await db.steles.bulkPut(steles);
     await db.rubbings.bulkPut(rubbings);
     await db.losses.bulkPut(losses);
     await db.seals.bulkPut(seals);
     await db.compares.bulkPut(compares);
+    await db.loans.bulkPut(loans);
   });
 }
 
@@ -244,15 +294,18 @@ export interface RubbingSnapshot {
   losses: Loss[];
   seals: Seal[];
   compares: Compare[];
+  /** v3 新增；旧备份（v2）可缺省，导入时按空集合处理 */
+  loans?: Loan[];
 }
 
 export async function exportSnapshot(): Promise<RubbingSnapshot> {
-  const [steles, rubbings, losses, seals, compares] = await Promise.all([
+  const [steles, rubbings, losses, seals, compares, loans] = await Promise.all([
     db.steles.toArray(),
     db.rubbings.toArray(),
     db.losses.toArray(),
     db.seals.toArray(),
     db.compares.toArray(),
+    db.loans.toArray(),
   ]);
   return {
     app: DB_NAME,
@@ -263,6 +316,7 @@ export async function exportSnapshot(): Promise<RubbingSnapshot> {
     losses,
     seals,
     compares,
+    loans,
   };
 }
 
@@ -275,29 +329,35 @@ export function validateSnapshot(input: unknown): string {
   for (const key of keys) {
     if (!Array.isArray(snapshot[key])) return `备份文件缺少 ${String(key)} 集合`;
   }
+  if (snapshot.loans !== undefined && !Array.isArray(snapshot.loans)) return '备份文件的 loans 集合不是数组';
   return '';
 }
 
 export async function clearAllTables(): Promise<void> {
-  await db.transaction('rw', [db.steles, db.rubbings, db.losses, db.seals, db.compares], async () => {
+  await db.transaction('rw', [db.steles, db.rubbings, db.losses, db.seals, db.compares, db.loans], async () => {
     await Promise.all([
       db.steles.clear(),
       db.rubbings.clear(),
       db.losses.clear(),
       db.seals.clear(),
       db.compares.clear(),
+      db.loans.clear(),
     ]);
   });
 }
 
 export async function importSnapshot(snapshot: RubbingSnapshot): Promise<void> {
   await clearAllTables();
-  await db.transaction('rw', [db.steles, db.rubbings, db.losses, db.seals, db.compares], async () => {
+  // 旧备份（v2）没有借展数据：拓本一律按未借展显示，借展集合按空处理
+  const rubbings = snapshot.rubbings.map((row) => ({ ...row, loanState: row.loanState ?? 'none' }));
+  const loans = snapshot.loans ?? [];
+  await db.transaction('rw', [db.steles, db.rubbings, db.losses, db.seals, db.compares, db.loans], async () => {
     await db.steles.bulkPut(snapshot.steles);
-    await db.rubbings.bulkPut(snapshot.rubbings);
+    await db.rubbings.bulkPut(rubbings);
     await db.losses.bulkPut(snapshot.losses);
     await db.seals.bulkPut(snapshot.seals);
     await db.compares.bulkPut(snapshot.compares);
+    await db.loans.bulkPut(loans);
   });
 }
 
@@ -307,23 +367,25 @@ export async function resetDatabase(): Promise<void> {
 }
 
 export async function countAll(): Promise<Record<string, number>> {
-  const [steles, rubbings, losses, seals, compares] = await Promise.all([
+  const [steles, rubbings, losses, seals, compares, loans] = await Promise.all([
     db.steles.count(),
     db.rubbings.count(),
     db.losses.count(),
     db.seals.count(),
     db.compares.count(),
+    db.loans.count(),
   ]);
-  return { steles, rubbings, losses, seals, compares };
+  return { steles, rubbings, losses, seals, compares, loans };
 }
 
-/** 级联删除碑刻 → 拓本 → 损泐 / 钤印 / 比对 */
+/** 级联删除碑刻 → 拓本 → 损泐 / 钤印 / 比对 / 借展 */
 export async function removeSteleCascade(steleId: string): Promise<void> {
   const rubbingIds = (await db.rubbings.where('steleId').equals(steleId).toArray()).map((row) => row.id);
-  await db.transaction('rw', [db.steles, db.rubbings, db.losses, db.seals, db.compares], async () => {
+  await db.transaction('rw', [db.steles, db.rubbings, db.losses, db.seals, db.compares, db.loans], async () => {
     if (rubbingIds.length > 0) {
       await db.losses.where('rubbingId').anyOf(rubbingIds).delete();
       await db.seals.where('rubbingId').anyOf(rubbingIds).delete();
+      await db.loans.where('rubbingId').anyOf(rubbingIds).delete();
     }
     await db.rubbings.where('steleId').equals(steleId).delete();
     await db.compares.where('steleId').equals(steleId).delete();
@@ -331,11 +393,12 @@ export async function removeSteleCascade(steleId: string): Promise<void> {
   });
 }
 
-/** 级联删除拓本 → 损泐 / 钤印 / 涉及的比对记录 */
+/** 级联删除拓本 → 损泐 / 钤印 / 借展 / 涉及的比对记录 */
 export async function removeRubbingCascade(rubbingId: string): Promise<void> {
-  await db.transaction('rw', [db.rubbings, db.losses, db.seals, db.compares], async () => {
+  await db.transaction('rw', [db.rubbings, db.losses, db.seals, db.compares, db.loans], async () => {
     await db.losses.where('rubbingId').equals(rubbingId).delete();
     await db.seals.where('rubbingId').equals(rubbingId).delete();
+    await db.loans.where('rubbingId').equals(rubbingId).delete();
     const compares = await db.compares.toArray();
     const affected = compares.filter((row) => row.rubbingIdA === rubbingId || row.rubbingIdB === rubbingId);
     if (affected.length > 0) await db.compares.bulkDelete(affected.map((row) => row.id));

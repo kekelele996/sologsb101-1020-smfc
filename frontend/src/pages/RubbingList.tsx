@@ -49,6 +49,8 @@ import {
   INK_TONE_LABEL,
   INK_TONE_OPTIONS,
   PAPER_TYPE_OPTIONS,
+  RUBBING_LOAN_STATE_COLOR,
+  RUBBING_LOAN_STATE_LABEL,
   RUBBING_METHOD_LABEL,
   RUBBING_METHOD_OPTIONS,
   RUBBING_STATE_COLOR,
@@ -58,6 +60,7 @@ import {
   type InkTone,
   type Rubbing,
   type RubbingDraft,
+  type RubbingLoanState,
   type RubbingMethod,
   type RubbingState,
 } from '@/types/rubbing';
@@ -124,6 +127,7 @@ export default function RubbingList() {
       cataloged,
       catalogedPercent: total === 0 ? 0 : Math.round((cataloged / total) * 100),
       toCompare: rubbings.filter((rubbing) => rubbing.state === 'toCompare').length,
+      onLoan: rubbings.filter((rubbing) => rubbing.loanState === 'onLoan').length,
       seals: seals.length,
       losses: losses.length,
     };
@@ -216,6 +220,14 @@ export default function RubbingList() {
     { title: '墨色', dataIndex: 'inkTone', width: 90, render: (value: InkTone) => INK_TONE_LABEL[value] },
     { title: '尺寸', dataIndex: 'sizeCm', width: 110, render: (value: string) => value || '未记' },
     { title: '收藏号', dataIndex: 'collectionNo', width: 120, render: (value: string) => value || '未编' },
+    {
+      title: '借展',
+      dataIndex: 'loanState',
+      width: 90,
+      render: (value: RubbingLoanState) => (
+        <Tag color={RUBBING_LOAN_STATE_COLOR[value]}>{RUBBING_LOAN_STATE_LABEL[value]}</Tag>
+      ),
+    },
     { title: '年代判断', dataIndex: 'dateGuess', width: 120, render: (value: string) => value || '待考' },
     {
       title: '损泐 / 钤印',
@@ -303,6 +315,7 @@ export default function RubbingList() {
         <StatBadge label="拓本总数" value={stat.total} suffix="份" tone="primary" />
         <StatBadge label="已编目占比" value={`${stat.catalogedPercent}%`} percent={stat.catalogedPercent} tone="success" />
         <StatBadge label="待比对" value={stat.toCompare} suffix="份" tone="warning" />
+        <StatBadge label="借出中" value={stat.onLoan} suffix="份" tone="danger" />
         <StatBadge label="钤印总数" value={stat.seals} suffix="方" tone="info" />
         <StatBadge label="损泐字位" value={stat.losses} suffix="条" tone="danger" />
       </div>

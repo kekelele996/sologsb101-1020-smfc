@@ -67,7 +67,7 @@ export function buildCatalogCard(
         .filter((seal) => seal.rubbingId === rubbing.id)
         .sort((a, b) => sealPositionWeight(a.position) - sealPositionWeight(b.position));
       lines.push(
-        `第 ${rubbing.versionNo} 版　${RUBBING_METHOD_LABEL[rubbing.method]}　${INK_TONE_LABEL[rubbing.inkTone]}　${rubbing.paperType}　${rubbing.sizeCm || '尺寸未记'}　收藏号 ${rubbing.collectionNo || '未编'}　${rubbing.dateGuess || '年代待考'}　${RUBBING_STATE_LABEL[rubbing.state]}`,
+        `第 ${rubbing.versionNo} 版　${RUBBING_METHOD_LABEL[rubbing.method]}　${INK_TONE_LABEL[rubbing.inkTone]}　${rubbing.paperType}　${rubbing.sizeCm || '尺寸未记'}　收藏号 ${rubbing.collectionNo || '未编'}　${rubbing.dateGuess || '年代待考'}　${RUBBING_STATE_LABEL[rubbing.state]}${rubbing.loanState === 'onLoan' ? '　借出中' : ''}`,
       );
       lines.push(`　损泐字位（${rubbingLosses.length} 条）：`);
       if (rubbingLosses.length === 0) lines.push('　　无');

@@ -1,6 +1,6 @@
 /**
  * 应用外壳：左侧导航 + 顶部当前碑刻上下文 + 页脚数据说明
- * 首屏初始化 IndexedDB（首次自动播种）并 dispatch(loadAll()) 载入三张表。
+ * 首屏初始化 IndexedDB（首次自动播种）并 dispatch(loadAll()) 载入四张表。
  */
 import { useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -12,12 +12,14 @@ import {
   ExportOutlined,
   FileSearchOutlined,
   PrinterOutlined,
+  SwapOutlined,
 } from '@ant-design/icons';
 import { ROUTES } from './router';
 import { loadAll, useAppDispatch, useAppSelector } from './stores/store';
 import { selectSteles } from './stores/steleSlice';
 import { selectRubbings } from './stores/rubbingSlice';
 import { selectLosses } from './stores/lossSlice';
+import { selectLoanStats } from './stores/loanSlice';
 import { initDatabase } from './utils/db';
 import { STELE_FORM_LABEL } from './types/stele';
 
@@ -32,6 +34,7 @@ export default function App() {
   const steles = useAppSelector(selectSteles);
   const rubbings = useAppSelector(selectRubbings);
   const losses = useAppSelector(selectLosses);
+  const loanStats = useAppSelector(selectLoanStats);
   const currentSteleId = useAppSelector((state) => state.stele.currentSteleId);
 
   useEffect(() => {
@@ -58,9 +61,11 @@ export default function App() {
       ? ROUTES.losses
       : location.pathname.startsWith('/compare')
         ? ROUTES.compare
-        : location.pathname.startsWith('/export')
-          ? ROUTES.export
-          : ROUTES.steles;
+        : location.pathname.startsWith('/loans')
+          ? ROUTES.loans
+          : location.pathname.startsWith('/export')
+            ? ROUTES.export
+            : ROUTES.steles;
 
   return (
     <Layout style={{ minHeight: '100vh', background: 'transparent' }}>
@@ -84,6 +89,7 @@ export default function App() {
             { key: ROUTES.rubbings, icon: <PrinterOutlined />, label: '拓本登记' },
             { key: ROUTES.losses, icon: <BookOutlined />, label: '损泐字位' },
             { key: ROUTES.compare, icon: <DiffOutlined />, label: '版本比对' },
+            { key: ROUTES.loans, icon: <SwapOutlined />, label: '借展管理' },
             { key: ROUTES.export, icon: <ExportOutlined />, label: '编目卡导出' },
           ]}
         />
@@ -94,6 +100,7 @@ export default function App() {
             </span>
             <span>拓本 {rubbings.length} 份</span>
             <span>损泐字位 {losses.length} 条</span>
+            <span>借出中 {loanStats.onLoan} 件</span>
           </Space>
         </div>
       </Sider>

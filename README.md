@@ -2,7 +2,7 @@
 
 面向碑刻拓片收藏机构编目员的本地化工具：把同一碑刻的不同拓本编目登记，标注损泐字位并做版本差异比对与断代辅助判断。
 
-核心动作：**建立碑刻与所在地档案 → 登记拓本的拓法与纸墨尺寸钤印 → 逐行标注损泐字位 → 执行同碑多版本比对与断代 → 导出编目卡**。
+核心动作：**建立碑刻与所在地档案 → 登记拓本的拓法与纸墨尺寸钤印 → 逐行标注损泐字位 → 执行同碑多版本比对与断代 → 外借展览点交与状况跟踪 → 导出编目卡**。
 
 纯前端单页应用（React 18 + TypeScript + Ant Design + Vite + Redux Toolkit + React Router），**无后端、无数据库服务、无 API 服务**，全部数据保存在浏览器本地（IndexedDB / Dexie + 少量 localStorage 元数据）。
 
@@ -68,9 +68,10 @@ npm run preview    # 本地预览构建产物（http://localhost:22820）
 | 路由 | 页面 | 主要职责 | 消费模型 |
 | --- | --- | --- | --- |
 | `/steles` | 碑刻与所在地台账 | 新建碑刻、按年代与形制筛选（同步 URL query），卡片回显已收拓本数、损泐字位与最近断代结论 | Stele、Rubbing、Loss、Compare |
-| `/rubbings` | 拓本登记 | 录入拓法、纸墨、尺寸与收藏号；同碑自动生成版本序号，钤印增删改与批量调整印别，批量改状态 | Rubbing、Seal、Stele |
+| `/rubbings` | 拓本登记 | 录入拓法、纸墨、尺寸与收藏号；同碑自动生成版本序号，钤印增删改与批量调整印别，批量改状态，回显借展标记 | Rubbing、Seal、Stele |
 | `/losses` | 损泐字位标注台 | 行号 × 字位网格逐格标注，批量改严重程度；选定基准拓本即时高亮差异字位 | Loss、Rubbing |
 | `/compare` | 同碑多版本比对与断代 | 选定 A/B 两拓本，按字位坐标比对损泐集合并排展示差异，推断早本 / 晚本 / 同版 / 待考并落库 | Compare、Loss、Rubbing |
+| `/loans` | 借展管理 | 收下外馆点交单（先收藏号再展柜号）并对账：对上的挂借出标记（拓法照旧）、认不上的挂待认领；展期状况记录以晚到的为准，新损伤只记借展侧；本侧写库失败单独重试 | Loan、Rubbing、Stele |
 | `/export` | 编目卡生成与导出 | 按碑刻生成编目卡文本、合订导出、钤印明细、JSON 导入导出、损泐台账 CSV、清空重播种 | 全部模型 |
 
 `/` 与未匹配路径重定向到 `/steles`。筛选条件写入 URL query（`?kw=&method=&state=` 等），可直接分享带条件的链接。
@@ -82,12 +83,13 @@ npm run preview    # 本地预览构建产物（http://localhost:22820）
 | 模型 | 文件 | 关键字段 | 说明 |
 | --- | --- | --- | --- |
 | Stele 碑刻 | `src/types/stele.ts` | `id` `title` `era` `location` `form`（碑/碣/摩崖/墓志） `sizeCm` `calligrapher` | 新建后进入拓本登记，卡片回显拓本数与差异条数 |
-| Rubbing 拓本 | `src/types/rubbing.ts` | `id` `steleId` `versionNo` `method`（擦拓/扑拓/蝉翼拓） `paperType` `inkTone`（浓墨/淡墨） `sizeCm` `collectionNo` `dateGuess` `state`（待编目/已编目/待比对） | 同碑多份并存，版本序号自动生成 |
+| Rubbing 拓本 | `src/types/rubbing.ts` | `id` `steleId` `versionNo` `method`（擦拓/扑拓/蝉翼拓） `paperType` `inkTone`（浓墨/淡墨） `sizeCm` `collectionNo` `dateGuess` `state`（待编目/已编目/待比对） `loanState`（未借展/借出中） | 同碑多份并存，版本序号自动生成；借展只挂标记，编目字段照旧 |
 | Loss 损泐字位 | `src/types/loss.ts` | `id` `rubbingId` `lineNo` `charNo` `type`（缺字/裂痕/漫漶/石花） `severity`（轻/中/重） `note` | 按行列网格标注，同碑同字位自动并排对比 |
 | Seal 钤印 | `src/types/seal.ts` | `id` `rubbingId` `sealText` `position` `transcription` `sealType`（收藏印/鉴赏印/作者印） | 按位置排序展示，支持批量改印别 |
 | Compare 版本比对 | `src/types/compare.ts` | `id` `steleId` `rubbingIdA` `rubbingIdB` `diffCount` `conclusion`（早本/晚本/同版/待考） `operator` `date` | 选定两拓本即生成差异清单并回写断代结论 |
+| Loan 借展 | `src/types/loan.ts` | `id` `rubbingId`（认不上为 null） `collectionNo` `caseNo` `venue` `handoverDate` `state`（借出中/待认领） `reports`（状况记录） | 点交单收下后生成；状况记录以晚到的为准，新损伤只记借展侧，不并入本馆损泐 |
 
-数据结构版本号 `DB_SCHEMA_VERSION` 定义在 `src/utils/db.ts`，当前为 `v2`：`losses` 表增加 `charNo` 与 `[rubbingId+lineNo+charNo]` 复合索引，并在 Dexie `.upgrade()` 中按行号顺序为历史字位记录重建 `charNo`。
+数据结构版本号 `DB_SCHEMA_VERSION` 定义在 `src/utils/db.ts`，当前为 `v3`：`v1→v2` 为 `losses` 表增加 `charNo` 与 `[rubbingId+lineNo+charNo]` 复合索引，并在 Dexie `.upgrade()` 中按行号顺序为历史字位记录重建 `charNo`；`v2→v3` 新增 `loans` 表，`rubbings` 增加 `loanState` 索引，历史拓本一律迁移为未借展。
 
 ---
 
@@ -97,13 +99,13 @@ npm run preview    # 本地预览构建产物（http://localhost:22820）
 sologsb101-1020/
 ├── frontend/                     # 前端源码
 │   ├── src/
-│   │   ├── types/                # stele.ts rubbing.ts loss.ts seal.ts compare.ts
-│   │   ├── stores/               # steleSlice.ts rubbingSlice.ts lossSlice.ts store.ts
+│   │   ├── types/                # stele.ts rubbing.ts loss.ts seal.ts compare.ts loan.ts
+│   │   ├── stores/               # steleSlice.ts rubbingSlice.ts lossSlice.ts loanSlice.ts store.ts
 │   │   ├── components/common/    # LossTag.tsx FilterBar.tsx StatBadge.tsx EmptyPanel.tsx
 │   │   ├── hooks/                # useLossDiff.ts useIdbTable.ts
-│   │   ├── pages/                # SteleList.tsx RubbingList.tsx LossBoard.tsx CompareView.tsx ExportView.tsx
+│   │   ├── pages/                # SteleList.tsx RubbingList.tsx LossBoard.tsx CompareView.tsx LoanBoard.tsx ExportView.tsx
 │   │   ├── router/               # index.tsx
-│   │   ├── utils/                # collate.ts db.ts export.ts
+│   │   ├── utils/                # collate.ts db.ts export.ts loan.ts
 │   │   ├── styles/               # main.css
 │   │   ├── App.tsx main.tsx
 │   ├── public/favicon.svg
@@ -123,9 +125,10 @@ sologsb101-1020/
 
 ## 七、数据存储说明
 
-- **IndexedDB（Dexie，数据库名 `gbrubbing`）**：5 张业务表 `steles` / `rubbings` / `losses` / `seals` / `compares`，由 `src/utils/db.ts` 统一定义 schema、版本号与升级迁移；`initDatabase()` 首次打开时自动播种**三层互相引用**的演示数据（Stele → Rubbing → Loss / Seal，另有 Stele → Compare，固定 id 如 `stele_01`、`rub_0101`、`loss_010101`），播种幂等，保证字位网格与比对台打开即有内容。
+- **IndexedDB（Dexie，数据库名 `gbrubbing`）**：6 张业务表 `steles` / `rubbings` / `losses` / `seals` / `compares` / `loans`，由 `src/utils/db.ts` 统一定义 schema、版本号与升级迁移；`initDatabase()` 首次打开时自动播种**三层互相引用**的演示数据（Stele → Rubbing → Loss / Seal，另有 Stele → Compare 与 Rubbing → Loan，固定 id 如 `stele_01`、`rub_0101`、`loss_010101`、`loan_0201`），播种幂等，保证字位网格、比对台与借展管理打开即有内容。
+- **借展对账**：`/loans` 页收下外馆点交单文本（每行「藏号 展柜号」），按先收藏号再展柜号排序后与本馆拓本对账；对上的只挂借出标记（拓法等编目字段照旧），认不上的挂待认领可事后认领；点交单快照留在 `loanSlice`，本馆写库失败的条目单独收集、单独重试，外馆那份不动；展期状况记录按到达时间取晚到者为准，新损伤只写借展记录，不进 `losses` 表。
 - **localStorage**：仅存元数据 —— `gbrubbing:db-version`（本地结构版本）、`gbrubbing:last-backup-at`（最近导出时间）、`gbrubbing:ui-prefs`（当前碑刻 / 拓本）。
-- **备份**：`/export` 页可导出 JSON（5 张表全量数据 + 结构版本号），导入时校验 `app` 字段与各集合数组完整性，覆盖导入前二次确认；另有编目卡 TXT 与损泐台账 CSV。
+- **备份**：`/export` 页可导出 JSON（6 张表全量数据 + 结构版本号），导入时校验 `app` 字段与各集合数组完整性（v2 旧备份缺 `loans` 集合与 `loanState` 字段可兼容导入，一律按未借展处理），覆盖导入前二次确认；另有编目卡 TXT 与损泐台账 CSV。
 - **隐私与无状态**：数据不上传任何服务器，容器不挂载命名卷；清理浏览器站点数据或更换浏览器会丢失档案，请定期导出备份。
 
 ---

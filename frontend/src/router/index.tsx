@@ -1,6 +1,6 @@
 /**
- * 路由表（与提示词逐字一致）
- * /steles、/rubbings、/losses、/compare、/export
+ * 路由表
+ * /steles、/rubbings、/losses、/compare、/loans、/export
  * 页面按路由懒加载，构建时自动分包。
  */
 import { Suspense, lazy, type ReactNode } from 'react';
@@ -12,6 +12,7 @@ const SteleList = lazy(() => import('../pages/SteleList'));
 const RubbingList = lazy(() => import('../pages/RubbingList'));
 const LossBoard = lazy(() => import('../pages/LossBoard'));
 const CompareView = lazy(() => import('../pages/CompareView'));
+const LoanBoard = lazy(() => import('../pages/LoanBoard'));
 const ExportView = lazy(() => import('../pages/ExportView'));
 
 export const ROUTES = {
@@ -19,6 +20,7 @@ export const ROUTES = {
   rubbings: '/rubbings',
   losses: '/losses',
   compare: '/compare',
+  loans: '/loans',
   export: '/export',
 } as const;
 
@@ -40,6 +42,7 @@ export const appRoutes: RouteObject[] = [
       { path: 'rubbings', element: withSuspense(<RubbingList />) },
       { path: 'losses', element: withSuspense(<LossBoard />) },
       { path: 'compare', element: withSuspense(<CompareView />) },
+      { path: 'loans', element: withSuspense(<LoanBoard />) },
       { path: 'export', element: withSuspense(<ExportView />) },
       { path: '*', element: <Navigate to={ROUTES.steles} replace /> },
     ],

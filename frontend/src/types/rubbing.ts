@@ -12,6 +12,9 @@ export type InkTone = 'thick' | 'light';
 /** 状态：待编目 / 已编目 / 待比对 */
 export type RubbingState = 'toCatalog' | 'cataloged' | 'toCompare';
 
+/** 借展标记：未借展 / 借出中（旧数据升级一律按未借展显示） */
+export type RubbingLoanState = 'none' | 'onLoan';
+
 export interface Rubbing {
   id: string;
   /** 所属碑刻 id */
@@ -32,6 +35,8 @@ export interface Rubbing {
   dateGuess: string;
   /** 状态 */
   state: RubbingState;
+  /** 借展标记 */
+  loanState: RubbingLoanState;
   createdAt: number;
   updatedAt: number;
 }
@@ -80,6 +85,16 @@ export const RUBBING_STATE_OPTIONS: ReadonlyArray<{ value: RubbingState; label: 
 
 export const RUBBING_STATE_FLOW: readonly RubbingState[] = ['toCatalog', 'cataloged', 'toCompare'];
 
+export const RUBBING_LOAN_STATE_LABEL: Record<RubbingLoanState, string> = {
+  none: '未借展',
+  onLoan: '借出中',
+};
+
+export const RUBBING_LOAN_STATE_COLOR: Record<RubbingLoanState, string> = {
+  none: '#8c8c8c',
+  onLoan: '#a33a2c',
+};
+
 export function nextRubbingState(state: RubbingState): RubbingState {
   const index = RUBBING_STATE_FLOW.indexOf(state);
   if (index < 0 || index >= RUBBING_STATE_FLOW.length - 1) return state;
@@ -99,5 +114,6 @@ export function createEmptyRubbingDraft(steleId: string, versionNo: number): Rub
     collectionNo: '',
     dateGuess: '',
     state: 'toCatalog',
+    loanState: 'none',
   };
 }
